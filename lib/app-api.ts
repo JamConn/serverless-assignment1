@@ -150,7 +150,7 @@ const getReviewsMovie = moviesEnd.addResource("{Id}").addResource("reviews");
 const getReviewsByName = reviewsEnd.addResource("{reviewerName}");
 
 
-
+const getMovieReviewsByName = moviesEnd.addResource("{reviewerName}");
 
 
 
@@ -166,7 +166,10 @@ const getReviewByNameFn = new node.NodejsFunction(this, "GetReviewByNameFn", {
 });
 
 
-
+const getMovieReviewByNameFn = new node.NodejsFunction(this, "GetMovieReviewByNameFn", {
+  ...appCommonFnProps,
+  entry: "./lambda/getReviewByIdAndName.ts",
+});
 
 
 
@@ -176,7 +179,7 @@ const getReviewByNameFn = new node.NodejsFunction(this, "GetReviewByNameFn", {
 
 getReviewsMovie.addMethod("GET", new apig.LambdaIntegration(getReviewsMovieFn));
 getReviewsByName.addMethod("GET", new apig.LambdaIntegration(getReviewByNameFn));
-
+getMovieReviewsByName.addMethod("GET", new apig.LambdaIntegration(getMovieReviewByNameFn));
 
 
 
@@ -184,7 +187,7 @@ getReviewsByName.addMethod("GET", new apig.LambdaIntegration(getReviewByNameFn))
 
 moviesTable.grantReadData(getReviewsMovieFn);
 moviesTable.grantReadData(getReviewByNameFn);
-
+moviesTable.grantReadData(getMovieReviewByNameFn);
 
 
 
