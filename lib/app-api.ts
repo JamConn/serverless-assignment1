@@ -31,7 +31,7 @@ export class AppApi extends Construct {
     });
 
     moviesTable.addLocalSecondaryIndex({
-      indexName: "RevName",
+      indexName: "ReviewName",
       sortKey: { name: "ReviewerName", type: dynamodb.AttributeType.STRING },
     });
 
@@ -147,6 +147,9 @@ const reviewsEnd = publicRes.addResource("reviews");
 const getReviewsMovie = moviesEnd.addResource("{Id}").addResource("reviews");
 
 
+const getReviewsByName = reviewsEnd.addResource("{reviewerName}");
+
+
 
 
 
@@ -155,6 +158,11 @@ const getReviewsMovie = moviesEnd.addResource("{Id}").addResource("reviews");
 const getReviewsMovieFn = new node.NodejsFunction(this, "GetReviewsMovieFn", {
   ...appCommonFnProps,
   entry: "./lambda/getReviewById.ts",
+});
+
+const getReviewByNameFn = new node.NodejsFunction(this, "GetReviewByNameFn", {
+  ...appCommonFnProps,
+  entry: "./lambda/getReviewByName.ts",
 });
 
 
@@ -167,7 +175,7 @@ const getReviewsMovieFn = new node.NodejsFunction(this, "GetReviewsMovieFn", {
 
 
 getReviewsMovie.addMethod("GET", new apig.LambdaIntegration(getReviewsMovieFn));
-
+getReviewsByName.addMethod("GET", new apig.LambdaIntegration(getReviewByNameFn));
 
 
 
@@ -175,7 +183,7 @@ getReviewsMovie.addMethod("GET", new apig.LambdaIntegration(getReviewsMovieFn));
 
 
 moviesTable.grantReadData(getReviewsMovieFn);
-
+moviesTable.grantReadData(getReviewByNameFn);
 
 
 
