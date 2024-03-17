@@ -66,6 +66,7 @@ export class AppApi extends Construct {
       runtime: lambda.Runtime.NODEJS_16_X,
       handler: "handler",
       environment: {
+        TABLE_NAME: moviesTable.tableName,
         USER_POOL_ID: props.userPoolId,
         CLIENT_ID: props.userPoolClientId,
         REGION: cdk.Aws.REGION,
