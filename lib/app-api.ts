@@ -92,9 +92,14 @@ export class AppApi extends Construct {
 
     //protected
 
-    const protectedRes = appApi.root.addResource("protected");
+    const protectedRes = appApi.root.addResource("protected").addResource("movies");
 
-    const publicRes = appApi.root.addResource("public");
+    const addReview = protectedRes.addResource("reviews");
+
+    const updateReview = protectedRes.addResource("{Id}").addResource("reviews").addResource("{reviewerName}");
+
+
+
 
     const addMovieReviewFn = new node.NodejsFunction(this, "AddMovieReviewFn", {
       ...appCommonFnProps,
@@ -104,18 +109,25 @@ export class AppApi extends Construct {
   const updateMovieReviewFn = new node.NodejsFunction(this, "UpdateMovieReviewFn", {
       ...appCommonFnProps,
       entry: "./lambda/updateReview.ts",
+
+
+
   });
 
   moviesTable.grantReadWriteData(addMovieReviewFn);
   moviesTable.grantReadWriteData(updateMovieReviewFn);
 
 
-  protectedRes.addMethod("POST", new apig.LambdaIntegration(addMovieReviewFn), {
+
+
+
+
+  addReview.addMethod("POST", new apig.LambdaIntegration(addMovieReviewFn), {
     authorizer: requestAuthorizer,
     authorizationType: apig.AuthorizationType.CUSTOM,
 });
 
-protectedRes.addMethod("PUT", new apig.LambdaIntegration(updateMovieReviewFn), {
+updateReview.addMethod("PUT", new apig.LambdaIntegration(updateMovieReviewFn), {
     authorizer: requestAuthorizer,
     authorizationType: apig.AuthorizationType.CUSTOM,
 });
@@ -123,6 +135,49 @@ protectedRes.addMethod("PUT", new apig.LambdaIntegration(updateMovieReviewFn), {
 
 
 //public
+
+
+const publicRes = appApi.root.addResource("public");
+
+const moviesEnd = publicRes.addResource("movies");
+
+const reviewsEnd = publicRes.addResource("reviews");
+
+
+const getReviewsMovie = moviesEnd.addResource("{Id}").addResource("reviews");
+
+
+
+
+
+
+
+const getReviewsMovieFn = new node.NodejsFunction(this, "GetReviewsMovieFn", {
+  ...appCommonFnProps,
+  entry: "./lambda/getReviewById.ts",
+});
+
+
+
+
+
+
+
+
+
+
+getReviewsMovie.addMethod("GET", new apig.LambdaIntegration(getReviewsMovieFn));
+
+
+
+
+
+
+
+moviesTable.grantReadData(getReviewsMovieFn);
+
+
+
 
 
 
