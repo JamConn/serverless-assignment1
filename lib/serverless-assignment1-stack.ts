@@ -1,38 +1,37 @@
-import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
-import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
-import * as custom from "aws-cdk-lib/custom-resources";
-import { generateBatch } from "../shared/utils";
-import {reviews} from "../seed/reviews";
-import * as apig from "aws-cdk-lib/aws-apigateway";
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
-
+import * as cdk from "aws-cdk-lib";
+import { Construct } from "constructs";
+import { UserPool } from "aws-cdk-lib/aws-cognito";
+import { AuthApi } from './auth-api'
+import {AppApi } from './app-api'
 export class ServerlessAssignment1Stack extends cdk.Stack {
+
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const moviesTable = new dynamodb.Table(this, "MoviesTable", {
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      partitionKey: { name: "Id", type: dynamodb.AttributeType.NUMBER },
+    const userPool = new UserPool(this, "UserPool", {
+      signInAliases: { username: true, email: true },
+      selfSignUpEnabled: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
-      tableName: "Movies",
     });
 
-    new custom.AwsCustomResource(this, "moviesddbInitData", {
-      onCreate: {
-        service: "DynamoDB",
-        action: "batchWriteItem",
-        parameters: {
-          RequestItems: {
-            [moviesTable.tableName]: generateBatch(reviews),
-          },
-        },
-        physicalResourceId: custom.PhysicalResourceId.of("moviesddbInitData"), //.of(Date.now().toString()),
-      },
-      policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
-        resources: [moviesTable.tableArn],
-      }),
+    const userPoolId = userPool.userPoolId;
+
+    const appClient = userPool.addClient("AppClient", {
+      authFlows: { userPassword: true },
     });
 
-  }
+    const userPoolClientId = appClient.userPoolClientId;
+
+    new AuthApi(this, 'AuthServiceApi', {
+      userPoolId: userPoolId,
+      userPoolClientId: userPoolClientId,
+    });
+
+    new AppApi(this, 'AppApi', {
+      userPoolId: userPoolId,
+      userPoolClientId: userPoolClientId,
+    } );
+
+  } 
+
 }

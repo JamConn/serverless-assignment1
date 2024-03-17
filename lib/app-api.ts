@@ -4,6 +4,12 @@ import { Construct } from "constructs";
 import * as apig from "aws-cdk-lib/aws-apigateway";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as node from "aws-cdk-lib/aws-lambda-nodejs";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+import * as custom from "aws-cdk-lib/custom-resources";
+import { generateBatch } from "../shared/utils";
+import {reviews} from "../seed/reviews";
+import * as lambdanode from "aws-cdk-lib/aws-lambda-nodejs";
+
 
 type AppApiProps = {
   userPoolId: string;
@@ -13,6 +19,37 @@ type AppApiProps = {
 export class AppApi extends Construct {
   constructor(scope: Construct, id: string, props: AppApiProps) {
     super(scope, id);
+
+    //Dynamo table
+
+    const moviesTable = new dynamodb.Table(this, "MoviesTable", {
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      partitionKey: { name: "Id", type: dynamodb.AttributeType.NUMBER },
+      sortKey: {name: "ReviewerName", type: dynamodb.AttributeType.STRING},
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      tableName: "Movies",
+    });
+
+    moviesTable.addLocalSecondaryIndex({
+      indexName: "RevName",
+      sortKey: { name: "ReviewerName", type: dynamodb.AttributeType.STRING },
+    });
+
+    new custom.AwsCustomResource(this, "moviesddbInitData", {
+      onCreate: {
+        service: "DynamoDB",
+        action: "batchWriteItem",
+        parameters: {
+          RequestItems: {
+            [moviesTable.tableName]: generateBatch(reviews),
+          },
+        },
+        physicalResourceId: custom.PhysicalResourceId.of("moviesddbInitData"), //.of(Date.now().toString()),
+      },
+      policy: custom.AwsCustomResourcePolicy.fromSdkCalls({
+        resources: [moviesTable.tableArn],
+      }),
+    });
 
     const appApi = new apig.RestApi(this, "AppApi", {
       description: "App RestApi",
@@ -35,19 +72,7 @@ export class AppApi extends Construct {
       },
     };
 
-    const protectedRes = appApi.root.addResource("protected");
 
-    const publicRes = appApi.root.addResource("public");
-
-    const protectedFn = new node.NodejsFunction(this, "ProtectedFn", {
-      ...appCommonFnProps,
-      entry: "./lambda/protected.ts",
-    });
-
-    const publicFn = new node.NodejsFunction(this, "PublicFn", {
-      ...appCommonFnProps,
-      entry: "./lambda/public.ts",
-    });
 
     const authorizerFn = new node.NodejsFunction(this, "AuthorizerFn", {
       ...appCommonFnProps,
@@ -64,11 +89,51 @@ export class AppApi extends Construct {
       }
     );
 
-    protectedRes.addMethod("GET", new apig.LambdaIntegration(protectedFn), {
-      authorizer: requestAuthorizer,
-      authorizationType: apig.AuthorizationType.CUSTOM,
-    });
+    //protected
 
-    publicRes.addMethod("GET", new apig.LambdaIntegration(publicFn));
+    const protectedRes = appApi.root.addResource("protected");
+
+    const publicRes = appApi.root.addResource("public");
+
+    const addMovieReviewFn = new node.NodejsFunction(this, "AddMovieReviewFn", {
+      ...appCommonFnProps,
+      entry: "./lambda/addMovieReview.ts",
+  });
+
+  const updateMovieReviewFn = new node.NodejsFunction(this, "UpdateMovieReviewFn", {
+      ...appCommonFnProps,
+      entry: "./lambda/updateReview.ts",
+  });
+
+  moviesTable.grantReadWriteData(addMovieReviewFn);
+  moviesTable.grantReadWriteData(updateMovieReviewFn);
+
+
+  protectedRes.addMethod("POST", new apig.LambdaIntegration(addMovieReviewFn), {
+    authorizer: requestAuthorizer,
+    authorizationType: apig.AuthorizationType.CUSTOM,
+});
+
+protectedRes.addMethod("PUT", new apig.LambdaIntegration(updateMovieReviewFn), {
+    authorizer: requestAuthorizer,
+    authorizationType: apig.AuthorizationType.CUSTOM,
+});
+
+
+
+//public
+
+
+
+
+ 
+
+
+ 
+
+
+
   }
+
+
 }
